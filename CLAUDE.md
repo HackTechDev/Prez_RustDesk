@@ -22,7 +22,7 @@ Requires Node >= 22.12 (enforced via `devEngines`). `node_modules` is not instal
 - `npm run package` — zip the presentation (`scripts/zip.js`).
 - React wrapper (`react/`, separate package): `npm run react:build`, `npm run react:test`, `npm run react:demo`. See `react/AGENTS.md` for its lifecycle/sync invariants.
 
-CI (`.github/workflows`) runs `npm run build && npm test` on Node 22/24 and codespell (config in `.codespellrc`).
+There is no CI: the upstream reveal.js GitHub workflows were removed. Run `npm run build && npm test` locally if you change the framework sources.
 
 ## Architecture (framework, if you need to touch it)
 
