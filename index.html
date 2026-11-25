@@ -605,7 +605,7 @@ sudo nft list ruleset | grep 2111  # la règle DNAT est là
 						<h2><span class="step">5</span> Le nom de domaine</h2>
 						<div class="cols">
 							<div>
-								<p class="small">Si l'IP change ou si le serveur déménage, on modifie le DNS : <strong>aucun client à reconfigurer</strong>.</p>
+								<p class="small">Si l'IP change ou si le serveur déménage, on modifie la <strong>zone DNS</strong>, via l'interface de configuration du nom de domaine de votre prestataire : <strong>aucun client à reconfigurer</strong>.</p>
 								<table class="small">
 									<thead><tr><th>Nom</th><th>Type</th><th>Valeur</th></tr></thead>
 									<tbody><tr><td><code>rustdesk.hacktech.dev</code></td><td>A</td><td><code>203.0.113.10</code></td></tr></tbody>
@@ -692,9 +692,9 @@ rustdesksignal.service  active running
 							<div>
 								<p class="small muted">Depuis un poste extérieur</p>
 								<pre><code class="language-plaintext" data-trim>
-$ nc -zv 203.0.113.10 21116
+$ nc -zv rustdesk.hacktech.dev 21116
 ... succeeded!
-$ nc -zv 203.0.113.10 21117
+$ nc -zv rustdesk.hacktech.dev 21117
 ... succeeded!
 								</code></pre>
 							</div>
@@ -719,9 +719,9 @@ $ nc -zv 203.0.113.10 21117
 						<p class="kicker">4. Les clients</p>
 						<h2>Installer le client</h2>
 						<pre><code class="language-bash" data-trim>
-wget https://github.com/rustdesk/rustdesk/releases/download/1.5.0/rustdesk-1.5.0-x86_64.AppImage
-chmod +x rustdesk-1.5.0-x86_64.AppImage
-./rustdesk-1.5.0-x86_64.AppImage
+wget https://github.com/rustdesk/rustdesk/releases/download/1.5.3/rustdesk-1.5.3-x86_64.AppImage
+chmod +x rustdesk-1.5.3-x86_64.AppImage
+./rustdesk-1.5.3-x86_64.AppImage
 						</code></pre>
 						<div class="cols" style="align-items: center; grid-template-columns: 1fr 1.3fr">
 							<p class="small">« <span class="bad">Pas prêt ; veuillez vérifier la connexion</span> » est <strong>normal</strong> : le client n'est pas encore configuré.</p>
