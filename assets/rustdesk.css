@@ -354,3 +354,16 @@
 	fill: none;
 	stroke-dasharray: 10 7;
 }
+
+/* Pied de page « Présentation réalisée avec reveal.js », sur toutes les slides */
+.reveal .deck-footer {
+	position: absolute;
+	left: 16px;
+	bottom: 10px;
+	z-index: 30;
+	font-size: 14px;
+	color: var(--muted);
+}
+.reveal .deck-footer a {
+	color: var(--r-link-color);
+}
