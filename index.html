@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 	<head>
 		<meta charset="utf-8" />
 		<meta
@@ -7,7 +7,7 @@
 			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
 		/>
 
-		<title>reveal.js</title>
+		<title>Son propre serveur RustDesk dans un conteneur LXD</title>
 
 		<link rel="stylesheet" href="dist/reset.css" />
 		<link rel="stylesheet" href="dist/reveal.css" />
@@ -15,12 +15,1199 @@
 
 		<!-- Theme used for syntax highlighted code -->
 		<link rel="stylesheet" href="dist/plugin/highlight/monokai.css" />
+
+		<!-- Thème propre à cette présentation -->
+		<link rel="stylesheet" href="assets/rustdesk.css" />
 	</head>
 	<body>
+		<!--
+			Présentation tirée du tutoriel « Installer un serveur RustDesk dans un conteneur LXD »
+			(../../tutoriel/item.md) et de ses supports (presentation/slides.md, demo.md,
+			questions-reponses.md).
+
+			Navigation : flèches gauche/droite entre les parties, haut/bas pour le détail.
+			Touche S : vue orateur (notes et minutage). Touche Échap : vue d'ensemble.
+			Alt + clic : zoom sur une capture.
+		-->
+
+		<!-- Pointes de flèches partagées par tous les schémas SVG -->
+		<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+			<defs>
+				<marker id="m-main" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+					<path d="M0,0 L10,5 L0,10 z" fill="#e6ebf2" />
+				</marker>
+				<marker id="m-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+					<path d="M0,0 L10,5 L0,10 z" fill="#2f86ff" />
+				</marker>
+				<marker id="m-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+					<path d="M0,0 L10,5 L0,10 z" fill="#3ecf8e" />
+				</marker>
+				<marker id="m-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+					<path d="M0,0 L10,5 L0,10 z" fill="#ffb547" />
+				</marker>
+				<marker id="m-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+					<path d="M0,0 L10,5 L0,10 z" fill="#ff6b6b" />
+				</marker>
+			</defs>
+		</svg>
+
 		<div class="reveal">
 			<div class="slides">
-				<section>Slide 1</section>
-				<section>Slide 2</section>
+				<!-- ============================================================
+				     Ouverture
+				     ============================================================ -->
+
+				<section class="title-slide">
+					<p class="kicker">Auto-hébergement · Bureau à distance</p>
+					<h1>Son propre serveur RustDesk</h1>
+					<h2>dans un conteneur LXD</h2>
+					<p>Prendre la main à distance… <span class="accent">sans passer par les serveurs des autres</span></p>
+					<p class="small muted">Ubuntu 24.04 · LXD · Debian 12 · RustDesk 1.5.0</p>
+					<aside class="notes">
+						0:00 — Ne pas rester sur cette slide. Enchaîner tout de suite sur la démonstration
+						d'accroche (demo.md, étape 0).
+					</aside>
+				</section>
+
+				<section>
+					<p class="kicker">Démonstration</p>
+					<h2>Prise en main d'un poste à distance</h2>
+					<p>à travers <strong>mon propre serveur</strong></p>
+					<div class="callout fragment" style="max-width: 820px">
+						Qui utilise TeamViewer, AnyDesk ou RustDesk ?<br />
+						<strong>Par où passent vos sessions ?</strong>
+					</div>
+					<aside class="notes">
+						0:00-0:03 — Accroche : sur le poste A, se connecter au poste B à travers le serveur de
+						démo (snapshot etape6-installe).
+						« Je viens de prendre la main sur cette machine. La question, c'est : par où est passée la
+						connexion ? Pas par les serveurs de RustDesk : par un serveur à moi, installé dans un
+						conteneur. On va le construire ensemble. »
+						Puis : lxc restore rustdesk etape2-cree — « Je remets tout à zéro. »
+					</aside>
+				</section>
+
+				<section>
+					<h2>Par défaut, où passe le trafic ?</h2>
+					<p class="small muted" style="margin-bottom: 0.3em">Message affiché par un client RustDesk <strong>non configuré</strong> :</p>
+					<pre class="error"><code class="language-plaintext" data-trim>
+WebRTC failed: Failed to connect: the target device is offline or does not exist.;
+fallback failed: Failed to connect to rs-ny.rustdesk.com:21116
+					</code></pre>
+					<ul>
+						<li class="fragment">Un client RustDesk non configuré utilise les <strong>serveurs publics</strong> de RustDesk</li>
+						<li class="fragment">Serveurs partagés, parfois saturés, <strong>hors de notre contrôle</strong></li>
+						<li class="fragment"><span class="ok">Solution</span> : héberger son propre serveur, <strong>gratuit et open source</strong></li>
+					</ul>
+					<aside class="notes">
+						0:03-0:08 — Sur le poste C (non configuré), tenter une connexion vers l'ID du poste B :
+						l'erreur rs-ny.rustdesk.com:21116 apparaît.
+						« Par défaut, le client passe par les serveurs publics de RustDesk. Ici, il ne trouve pas
+						le poste, parce que le poste B est enregistré sur mon serveur, pas sur le leur. »
+						Message clé : on ne maîtrise ni la disponibilité ni le point de passage.
+					</aside>
+				</section>
+
+				<section>
+					<h2>Au programme</h2>
+					<div class="cols three">
+						<div class="card card-accent">
+							<h3>1. Comprendre</h3>
+							<ul>
+								<li>hbbs et hbbr</li>
+								<li>Pourquoi LXD</li>
+							</ul>
+						</div>
+						<div class="card card-accent">
+							<h3>2. Le réseau</h3>
+							<ul>
+								<li>DNAT et <code>nat=true</code></li>
+								<li>Le piège du pare-feu</li>
+							</ul>
+						</div>
+						<div class="card card-accent">
+							<h3>3. Installer</h3>
+							<ul>
+								<li>Conteneur, ports</li>
+								<li>Script <code>install.sh</code></li>
+							</ul>
+						</div>
+						<div class="card card-accent">
+							<h3>4. Les clients</h3>
+							<ul>
+								<li>Serveur ID + clé</li>
+								<li>Se connecter</li>
+							</ul>
+						</div>
+						<div class="card card-accent">
+							<h3>5. Dépanner</h3>
+							<ul>
+								<li>Les deux erreurs classiques</li>
+							</ul>
+						</div>
+						<div class="card card-accent">
+							<h3>6. Exploiter</h3>
+							<ul>
+								<li>Sauvegarde, mise à jour</li>
+								<li>Sécurité</li>
+							</ul>
+						</div>
+					</div>
+				</section>
+
+				<!-- ============================================================
+				     1. Comprendre
+				     ============================================================ -->
+
+				<section>
+					<section>
+						<p class="kicker">1. Comprendre</p>
+						<h2>Un serveur RustDesk, c'est deux programmes</h2>
+						<table>
+							<thead>
+								<tr><th>Programme</th><th>Rôle</th><th>Ports</th></tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td><strong>hbbs</strong></td>
+									<td>Serveur ID (rendez-vous) : enregistre les postes et les met en relation</td>
+									<td><code>21115</code>, <code>21116</code> (TCP + UDP)</td>
+								</tr>
+								<tr>
+									<td><strong>hbbr</strong></td>
+									<td>Relais : fait transiter le trafic si la connexion directe échoue</td>
+									<td><code>21117</code></td>
+								</tr>
+							</tbody>
+						</table>
+						<div class="callout fragment">
+							La plupart du temps, les postes se connectent <strong>directement</strong>
+							(<em>hole punching</em>) : le serveur ne fait que les présenter.
+						</div>
+						<aside class="notes">
+							Insister : le serveur consomme peu tant que les connexions directes réussissent.
+							Flèche bas : schéma du fonctionnement.
+						</aside>
+					</section>
+
+					<section>
+						<h2>Connexion directe ou relais</h2>
+						<svg class="diagram" viewBox="0 0 1000 400" role="img" aria-label="Les deux postes s'enregistrent auprès de hbbs, puis se connectent directement ; à défaut, le trafic passe par le relais hbbr">
+							<!-- hbbs -->
+							<rect class="box-accent" x="400" y="10" width="200" height="80" rx="12" />
+							<text class="t-title" x="500" y="45" text-anchor="middle">hbbs</text>
+							<text class="t-mono" x="500" y="73" text-anchor="middle">21115 · 21116</text>
+							<!-- Postes -->
+							<rect class="box" x="30" y="160" width="200" height="80" rx="12" />
+							<text class="t-title" x="130" y="195" text-anchor="middle">Poste A</text>
+							<text class="t-muted" x="130" y="222" text-anchor="middle">contrôle</text>
+							<rect class="box" x="770" y="160" width="200" height="80" rx="12" />
+							<text class="t-title" x="870" y="195" text-anchor="middle">Poste B</text>
+							<text class="t-muted" x="870" y="222" text-anchor="middle">est contrôlé</text>
+							<!-- 1. mise en relation -->
+							<line class="arrow-accent" x1="230" y1="168" x2="398" y2="72" marker-end="url(#m-accent)" />
+							<line class="arrow-accent" x1="770" y1="168" x2="602" y2="72" marker-end="url(#m-accent)" />
+							<text class="t-accent" x="500" y="130" text-anchor="middle">① mise en relation</text>
+							<!-- 2. directe -->
+							<g class="fragment">
+								<line class="arrow-ok" x1="236" y1="200" x2="764" y2="200" marker-start="url(#m-ok)" marker-end="url(#m-ok)" />
+								<text class="t-ok" x="500" y="188" text-anchor="middle">② connexion directe</text>
+								<text class="t-muted" x="500" y="228" text-anchor="middle">hole punching</text>
+							</g>
+							<!-- 3. relais -->
+							<g class="fragment">
+								<rect class="box-warn" x="400" y="310" width="200" height="80" rx="12" />
+								<text class="t-title" x="500" y="345" text-anchor="middle">hbbr</text>
+								<text class="t-mono" x="500" y="373" text-anchor="middle">21117</text>
+								<path class="arrow-warn" d="M130,240 V350 H394" marker-end="url(#m-warn)" />
+								<path class="arrow-warn" d="M600,350 H870 V246" marker-end="url(#m-warn)" />
+								<text class="t-warn" x="265" y="335" text-anchor="middle">③ sinon : relais</text>
+							</g>
+						</svg>
+						<aside class="notes">
+							① Les deux postes s'enregistrent auprès de hbbs, qui les met en relation.
+							② Ils essaient ensuite de se connecter directement (hole punching).
+							③ Si les pare-feu l'empêchent, le trafic passe par hbbr : c'est seulement là que le
+							serveur consomme de la bande passante.
+						</aside>
+					</section>
+				</section>
+
+				<section>
+					<section>
+						<p class="kicker">1. Comprendre</p>
+						<h2>Un cas d'usage parmi d'autres</h2>
+						<div class="cols wide-left">
+							<div class="card card-accent">
+								<h3>Ce tutoriel</h3>
+								<ul>
+									<li>Un serveur <strong>Ubuntu</strong> qui héberge déjà d'autres services dans des conteneurs <strong>LXD</strong></li>
+									<li>Le serveur RustDesk <strong>OSS</strong> (gratuit), installé par script dans un conteneur <strong>Debian</strong></li>
+									<li>Des postes clients <strong>Linux</strong>, client au format AppImage</li>
+								</ul>
+							</div>
+							<div class="card">
+								<h3>Autres méthodes serveur</h3>
+								<ul>
+									<li><strong>Docker</strong> : méthode mise en avant par la doc officielle</li>
+									<li>Paquets <strong>.deb</strong> de rustdesk-server</li>
+									<li><strong>Binaires</strong> hbbs / hbbr + systemd</li>
+									<li><strong>Server Pro</strong> (payant) : comptes, console web</li>
+								</ul>
+							</div>
+						</div>
+						<p class="small muted">Le serveur peut aussi tourner directement sur l'hôte, dans une VM ou sur un petit VPS.</p>
+						<aside class="notes">
+							Ce n'est ni la seule méthode, ni forcément la meilleure pour tous les cas.
+							Script utilisé : techahold/rustdeskinstall (méthode 2 de la documentation officielle).
+						</aside>
+					</section>
+
+					<section>
+						<h2>Les clients</h2>
+						<table>
+							<thead>
+								<tr><th>Système</th><th>Formats disponibles</th></tr>
+							</thead>
+							<tbody>
+								<tr><td>Linux</td><td>AppImage (ce tutoriel), <code>.deb</code>, <code>.rpm</code>, Flatpak</td></tr>
+								<tr><td>Windows</td><td>Installateur <code>.exe</code> ou <code>.msi</code></td></tr>
+								<tr><td>macOS</td><td><code>.dmg</code></td></tr>
+								<tr><td>Android</td><td><code>.apk</code>, F-Droid</td></tr>
+								<tr><td>iOS</td><td>App Store <span class="muted">(contrôler un poste, pas être contrôlé)</span></td></tr>
+							</tbody>
+						</table>
+						<div class="callout">
+							Quelle que soit la plateforme, la configuration est la même :
+							<strong>serveur ID</strong> + <strong>clé</strong>.
+						</div>
+					</section>
+				</section>
+
+				<section>
+					<p class="kicker">1. Comprendre</p>
+					<h2>Pourquoi LXD ?</h2>
+					<p class="small">
+						<strong>Conteneur système</strong> : une petite Debian complète (systemd, apt), qui partage
+						le noyau de l'hôte
+					</p>
+					<div class="cols">
+						<div class="card card-ok">
+							<h3 class="ok">Avantages</h3>
+							<ul>
+								<li>Isolé du reste du serveur</li>
+								<li>Léger, démarre en quelques secondes</li>
+								<li>S'administre comme un serveur Debian : le script marche tel quel</li>
+								<li>Snapshots et export en une commande</li>
+								<li>Supprimer le conteneur ne laisse aucune trace</li>
+							</ul>
+						</div>
+						<div class="card card-bad">
+							<h3 class="bad">Inconvénients</h3>
+							<ul>
+								<li>Isolation moins forte qu'une VM (noyau partagé)</li>
+								<li>Réseau privé : IP fixe et redirection nécessaires</li>
+								<li>Hôte <strong>et</strong> conteneur à mettre à jour</li>
+								<li>Moins documenté que Docker</li>
+							</ul>
+						</div>
+					</div>
+					<p class="small muted">Incus, le fork communautaire de LXD, s'utilise de la même façon : <code>lxc</code> → <code>incus</code></p>
+					<aside class="notes">
+						0:08-0:10 — Question probable : « Pourquoi pas Docker ? »
+						Réponse : un conteneur LXD est une Debian complète, le script fonctionne tel quel. Docker
+						est très bien aussi (image officielle) : question d'habitude et d'outillage existant.
+						VM : isole mieux, mais consomme plus pour un service aussi léger.
+					</aside>
+				</section>
+
+				<!-- ============================================================
+				     2. Le réseau
+				     ============================================================ -->
+
+				<section>
+					<p class="kicker">2. Le réseau</p>
+					<h2>Le problème</h2>
+					<svg class="diagram" viewBox="0 0 1000 260" role="img" aria-label="Un client sur Internet doit joindre un conteneur placé sur le réseau privé de l'hôte">
+						<rect class="box" x="20" y="80" width="200" height="100" rx="12" />
+						<text class="t-title" x="120" y="122" text-anchor="middle">Client</text>
+						<text class="t-mono" x="120" y="152" text-anchor="middle">198.51.100.7</text>
+
+						<rect class="zone" x="300" y="20" width="680" height="225" rx="16" />
+						<text class="t-muted" x="320" y="50">Hôte Ubuntu ·</text>
+						<text class="t-mono" x="438" y="50">203.0.113.10</text>
+
+						<rect class="box-warn" x="430" y="95" width="140" height="70" rx="12" />
+						<text class="t-warn" x="500" y="140" text-anchor="middle" style="font-size: 30px">???</text>
+
+						<rect class="box-accent" x="690" y="80" width="260" height="100" rx="12" />
+						<text class="t-title" x="820" y="122" text-anchor="middle">Conteneur rustdesk</text>
+						<text class="t-mono" x="820" y="152" text-anchor="middle">10.10.10.50</text>
+						<text class="t-muted" x="820" y="215" text-anchor="middle">réseau privé lxdbr0</text>
+
+						<line class="arrow" x1="220" y1="130" x2="424" y2="130" marker-end="url(#m-main)" />
+						<line class="arrow" x1="570" y1="130" x2="684" y2="130" marker-end="url(#m-main)" />
+					</svg>
+					<ul>
+						<li class="fragment">Il faut <strong>rediriger les ports</strong> de l'hôte vers le conteneur</li>
+						<li class="fragment">
+							<span class="warn">Contrainte</span> : hbbs doit voir l'<strong>IP réelle des clients</strong>,
+							sinon pas de connexion directe
+						</li>
+					</ul>
+					<aside class="notes">
+						0:10 — Poser la question à la salle : « Comment feriez-vous chez vous avec une box ? »
+						Réponse attendue : une redirection de ports. Parfait, c'est exactement ça.
+					</aside>
+				</section>
+
+				<section>
+					<p class="kicker">2. Le réseau</p>
+					<h2>La solution : DNAT</h2>
+					<table>
+						<thead>
+							<tr><th></th><th>Change…</th><th>Exemple</th></tr>
+						</thead>
+						<tbody>
+							<tr><td><strong>SNAT</strong></td><td>l'adresse <strong>source</strong></td><td>La box quand un PC sort sur Internet</td></tr>
+							<tr><td><strong>DNAT</strong></td><td>l'adresse <strong>de destination</strong></td><td>La « redirection de ports » de la box</td></tr>
+						</tbody>
+					</table>
+					<pre class="fragment"><code class="language-plaintext" data-trim>
+Avant : client 198.51.100.7 → 203.0.113.10:21116
+Après : client 198.51.100.7 → 10.10.10.50:21116    (source inchangée ✅)
+					</code></pre>
+					<aside class="notes">
+						Montrer que seule la destination change : hbbs voit toujours 198.51.100.7.
+					</aside>
+				</section>
+
+				<section>
+					<p class="kicker">2. Le réseau</p>
+					<h2>Proxy devices LXD en mode <code>nat=true</code></h2>
+					<pre><code class="language-bash" data-trim>
+lxc config device add rustdesk rd-tcp proxy \
+  listen=tcp:203.0.113.10:21115-21117 \
+  connect=tcp:10.10.10.50:21115-21117 nat=true
+					</code></pre>
+					<ul>
+						<li class="fragment">On <strong>déclare</strong> la redirection dans la configuration du conteneur</li>
+						<li class="fragment">LXD <strong>crée la règle DNAT</strong> dans le noyau de l'hôte (nftables)</li>
+						<li class="fragment"><strong>Aucun programme</strong> ne relaie le trafic</li>
+						<li class="fragment">Règles créées et supprimées avec le conteneur, incluses dans les snapshots</li>
+					</ul>
+					<aside class="notes">
+						0:15 — Démo : sudo nft list ruleset | grep 2111 pour montrer la règle « invisible ».
+						Sans nat=true, un processus forkproxy de LXD relaierait les connexions et le conteneur
+						verrait l'IP de l'hôte (slide de réserve en fin de diaporama).
+					</aside>
+				</section>
+
+				<section>
+					<p class="kicker">2. Le réseau</p>
+					<h2>Le chemin complet</h2>
+					<svg class="diagram" viewBox="0 0 1100 300" role="img" aria-label="Client, puis IP publique de l'hôte, puis règle DNAT créée par LXD, puis conteneur ; l'IP source du client est conservée">
+						<rect class="box" x="20" y="60" width="220" height="120" rx="12" />
+						<text class="t-title" x="130" y="100" text-anchor="middle">Client</text>
+						<text class="t-mono" x="130" y="132" text-anchor="middle">198.51.100.7</text>
+
+						<g class="fragment" data-fragment-index="1">
+							<line class="arrow" x1="240" y1="120" x2="294" y2="120" marker-end="url(#m-main)" />
+							<rect class="box" x="300" y="60" width="220" height="120" rx="12" />
+							<text class="t-title" x="410" y="100" text-anchor="middle">IP publique</text>
+							<text class="t-mono" x="410" y="132" text-anchor="middle">203.0.113.10</text>
+							<text class="t-muted" x="410" y="160" text-anchor="middle">21115-21117 tcp · 21116 udp</text>
+						</g>
+
+						<g class="fragment" data-fragment-index="2">
+							<line class="arrow" x1="520" y1="120" x2="574" y2="120" marker-end="url(#m-main)" />
+							<rect class="box-warn" x="580" y="60" width="220" height="120" rx="12" />
+							<text class="t-title" x="690" y="100" text-anchor="middle">Règle DNAT</text>
+							<text class="t-muted" x="690" y="130" text-anchor="middle">nftables, créée par LXD</text>
+							<text class="t-mono" x="690" y="160" text-anchor="middle">nat=true</text>
+						</g>
+
+						<g class="fragment" data-fragment-index="3">
+							<line class="arrow" x1="800" y1="120" x2="854" y2="120" marker-end="url(#m-main)" />
+							<rect class="box-accent" x="860" y="60" width="220" height="120" rx="12" />
+							<text class="t-title" x="970" y="100" text-anchor="middle">Conteneur</text>
+							<text class="t-mono" x="970" y="132" text-anchor="middle">10.10.10.50</text>
+							<text class="t-muted" x="970" y="160" text-anchor="middle">hbbs · hbbr</text>
+						</g>
+
+						<g class="fragment" data-fragment-index="4">
+							<path class="arrow-ok" d="M130,180 V235 H970 V186" marker-end="url(#m-ok)" />
+							<text class="t-ok" x="550" y="275" text-anchor="middle">destination réécrite, IP du client conservée : hbbs voit 198.51.100.7</text>
+						</g>
+					</svg>
+				</section>
+
+				<section>
+					<p class="kicker">2. Le réseau</p>
+					<h2>Le piège : le pare-feu</h2>
+					<svg class="diagram" viewBox="0 0 1000 320" role="img" aria-label="Le trafic destiné à l'hôte passe par INPUT, le trafic redirigé vers le conteneur passe par FORWARD" style="max-height: 340px">
+						<rect class="box" x="20" y="120" width="170" height="80" rx="12" />
+						<text class="t-title" x="105" y="167" text-anchor="middle">Internet</text>
+
+						<rect class="zone" x="250" y="15" width="730" height="290" rx="16" />
+						<text class="t-muted" x="270" y="45">Hôte</text>
+
+						<rect class="box" x="290" y="120" width="180" height="80" rx="12" />
+						<text class="t-title" x="380" y="155" text-anchor="middle">Noyau</text>
+						<text class="t-muted" x="380" y="182" text-anchor="middle">pour qui ?</text>
+
+						<rect class="box-bad" x="560" y="40" width="190" height="70" rx="12" />
+						<text class="t-title" x="655" y="72" text-anchor="middle">INPUT</text>
+						<text class="t-muted" x="655" y="97" text-anchor="middle">pour l'hôte (SSH…)</text>
+						<text class="t-mono" x="655" y="140" text-anchor="middle">ufw allow</text>
+
+						<rect class="box-ok" x="560" y="200" width="190" height="70" rx="12" />
+						<text class="t-title" x="655" y="232" text-anchor="middle">FORWARD</text>
+						<text class="t-muted" x="655" y="257" text-anchor="middle">traverse l'hôte</text>
+						<text class="t-mono" x="655" y="294" text-anchor="middle">ufw route allow</text>
+
+						<rect class="box-accent" x="800" y="200" width="160" height="70" rx="12" />
+						<text class="t-title" x="880" y="232" text-anchor="middle">Conteneur</text>
+						<text class="t-mono" x="880" y="257" text-anchor="middle">10.10.10.50</text>
+
+						<line class="arrow" x1="190" y1="160" x2="284" y2="160" marker-end="url(#m-main)" />
+						<line class="arrow" x1="470" y1="145" x2="554" y2="82" marker-end="url(#m-main)" />
+						<line class="arrow" x1="470" y1="175" x2="554" y2="230" marker-end="url(#m-main)" />
+						<line class="arrow-ok" x1="750" y1="235" x2="794" y2="235" marker-end="url(#m-ok)" />
+					</svg>
+					<pre class="fragment"><code class="language-bash" data-trim>
+sudo ufw allow 21116                                             # ❌ ne suffit pas
+sudo ufw route allow proto tcp to 10.10.10.50 port 21115:21117   # ✅
+sudo ufw route allow proto udp to 10.10.10.50 port 21116         # ✅
+					</code></pre>
+					<aside class="notes">
+						Bon moment pour une question à la salle : « Pourquoi ufw allow ne marcherait pas ? »
+						Le trafic redirigé (DNAT) traverse l'hôte : chaîne FORWARD. ufw allow ne règle que INPUT,
+						le trafic destiné à l'hôte lui-même.
+					</aside>
+				</section>
+
+				<!-- ============================================================
+				     3. Installer
+				     ============================================================ -->
+
+				<section>
+					<section>
+						<p class="kicker">3. Installer</p>
+						<h2>Installation en direct</h2>
+						<div class="cols">
+							<div>
+								<p><span class="step">1</span> Créer le conteneur Debian</p>
+								<p><span class="step">2</span> Lui donner une <strong>IP fixe</strong></p>
+								<p><span class="step">3</span> Repérer l'IP publique de l'hôte</p>
+								<p><span class="step">4</span> Déclarer les <strong>proxy devices</strong></p>
+							</div>
+							<div>
+								<p><span class="step">5</span> Le <strong>nom de domaine</strong></p>
+								<p><span class="step">6</span> Lancer <code>install.sh</code></p>
+								<p><span class="step">7</span> <strong>Noter la clé publique</strong></p>
+								<p><span class="step">8</span> Vérifier et tester</p>
+							</div>
+						</div>
+						<p class="small muted">Prérequis : Ubuntu avec SSH et sudo, IP publique fixe, LXD installé (<code>snap install lxd</code>, <code>lxd init</code>)</p>
+						<aside class="notes">
+							0:20-0:40 — Passer au terminal (demo.md, étapes 2 à 7). tmux : hôte à gauche,
+							conteneur à droite. Flèche bas pour le détail de chaque étape.
+						</aside>
+					</section>
+
+					<section>
+						<h2><span class="step">1</span><span class="step">2</span> Conteneur et IP fixe</h2>
+						<pre><code class="language-bash" data-trim data-line-numbers="1|3|5-6|7-8">
+lxc launch images:debian/12 rustdesk          # IP dynamique (DHCP) : 10.10.10.120
+
+lxc network get lxdbr0 ipv4.address           # 10.10.10.1/24
+lxc list -c n4                                # IP déjà utilisées
+lxc config device override rustdesk eth0 ipv4.address=10.10.10.50
+lxc restart rustdesk
+lxc list rustdesk
+# | rustdesk | RUNNING | 10.10.10.50 (eth0) | ...
+						</code></pre>
+						<div class="callout warn">
+							L'IP fixe est <strong>obligatoire</strong> en mode <code>nat=true</code> : la règle DNAT
+							doit savoir où envoyer les paquets.
+						</div>
+						<aside class="notes">
+							0:20-0:22 — « Le conteneur existe, avec une IP attribuée par DHCP. Problème : cette IP
+							peut changer. »
+						</aside>
+					</section>
+
+					<section>
+						<h2><span class="step">3</span> L'IP publique de l'hôte</h2>
+						<pre><code class="language-plaintext" data-trim data-line-numbers="2-4|5-6">
+$ ip -4 addr show scope global
+2: eno1: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc mq state UP
+    inet 203.0.113.10/24 metric 100 brd 203.0.113.255 scope global dynamic eno1
+       valid_lft 78107sec preferred_lft 78107sec
+18: lxdbr0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc noqueue state UP
+    inet 10.10.10.1/24 scope global lxdbr0
+						</code></pre>
+						<ul class="small">
+							<li>L'IP publique est sur l'interface externe <code>eno1</code>, pas sur <code>lxdbr0</code> (bridge LXD) ni <code>lxcbr0</code></li>
+						</ul>
+						<div class="callout warn">
+							<code>dynamic</code> = IP attribuée par DHCP. Si elle change, la redirection cesse : vérifier
+							que l'hébergeur garantit une IP stable.
+						</div>
+						<aside class="notes">
+							0:24 — « On cherche l'IP de l'interface externe. Pas lxdbr0, qui est le réseau privé
+							des conteneurs. »
+						</aside>
+					</section>
+
+					<section>
+						<h2><span class="step">4</span> Les proxy devices</h2>
+						<table class="small">
+							<thead>
+								<tr><th>Port</th><th>Protocole</th><th>Rôle</th></tr>
+							</thead>
+							<tbody>
+								<tr><td><code>21115</code></td><td>TCP</td><td>Test NAT (hbbs)</td></tr>
+								<tr><td><code>21116</code></td><td>TCP + UDP</td><td>Serveur ID (hbbs)</td></tr>
+								<tr><td><code>21117</code></td><td>TCP</td><td>Relais (hbbr)</td></tr>
+								<tr><td class="muted"><code>21114</code></td><td class="muted">—</td><td class="bad">API, version Pro : ne pas rediriger</td></tr>
+							</tbody>
+						</table>
+						<pre><code class="language-bash" data-trim>
+lxc config device add rustdesk rd-tcp proxy \
+  listen=tcp:203.0.113.10:21115-21117 connect=tcp:10.10.10.50:21115-21117 nat=true
+lxc config device add rustdesk rd-udp proxy \
+  listen=udp:203.0.113.10:21116 connect=udp:10.10.10.50:21116 nat=true
+						</code></pre>
+					</section>
+
+					<section>
+						<h2>Moment clé : rien n'écoute… et pourtant</h2>
+						<pre><code class="language-bash" data-trim data-line-numbers="1|3-7">
+sudo ss -tlnp | grep 2111          # rien sur l'hôte
+
+sudo nft list ruleset | grep 2111  # la règle DNAT est là
+    ip daddr 203.0.113.10 tcp dport 21115-21117 dnat ip to 10.10.10.50
+    ip saddr 10.10.10.50 ip daddr 10.10.10.50 tcp dport 21115-21117 masquerade
+    ip daddr 203.0.113.10 udp dport 21116 dnat ip to 10.10.10.50:21116
+    ip saddr 10.10.10.50 ip daddr 10.10.10.50 udp dport 21116 masquerade
+						</code></pre>
+						<p class="fragment">C'est le <strong>noyau</strong> qui réécrit la destination des paquets.</p>
+						<aside class="notes">
+							0:25 — « Aucun programme n'écoute sur l'hôte. Pourtant, la redirection fonctionne :
+							c'est le noyau qui réécrit la destination des paquets. »
+							Point de reprise : lxc restore rustdesk etape5-ports
+						</aside>
+					</section>
+
+					<section>
+						<h2><span class="step">5</span> Le nom de domaine</h2>
+						<div class="cols">
+							<div>
+								<p class="small">Si l'IP change ou si le serveur déménage, on modifie le DNS : <strong>aucun client à reconfigurer</strong>.</p>
+								<table class="small">
+									<thead><tr><th>Nom</th><th>Type</th><th>Valeur</th></tr></thead>
+									<tbody><tr><td><code>rustdesk.hacktech.dev</code></td><td>A</td><td><code>203.0.113.10</code></td></tr></tbody>
+								</table>
+							</div>
+							<div>
+								<pre><code class="language-bash" data-trim>
+$ dig +short rustdesk.hacktech.dev
+203.0.113.10
+								</code></pre>
+								<ul class="small">
+									<li><code>install.sh</code> : répondre <code>2</code> (DNS/Domain)</li>
+									<li>Clients : le nom dans <strong>Serveur ID</strong></li>
+								</ul>
+							</div>
+						</div>
+						<div class="callout">
+							Les proxy devices visent toujours l'IP publique : si elle change, mettre à jour
+							<strong>le DNS et</strong> l'adresse <code>listen</code>.
+						</div>
+						<aside class="notes">
+							Choix à faire AVANT l'installation. Si le serveur a déjà été installé avec une IP, pas
+							besoin de relancer le script : créer l'enregistrement DNS et remplacer l'IP par le nom
+							dans les clients. La clé reste la même.
+						</aside>
+					</section>
+
+					<section>
+						<h2><span class="step">6</span> Le script d'installation</h2>
+						<pre><code class="language-bash" data-trim data-line-numbers="1|2|3-4|5">
+lxc exec rustdesk -- bash                       # on entre dans le conteneur
+apt update &amp;&amp; apt install -y wget sudo curl
+wget https://raw.githubusercontent.com/techahold/rustdeskinstall/master/install.sh
+chmod +x install.sh
+./install.sh
+						</code></pre>
+						<table class="small">
+							<thead><tr><th>Question du script</th><th>Réponse conseillée</th></tr></thead>
+							<tbody>
+								<tr><td><em>Choose your preferred connection method</em></td><td><code>2</code> DNS/Domain, puis <code>rustdesk.hacktech.dev</code></td></tr>
+								<tr><td><em>Download configs and install HTTP server</em></td><td><code>2</code> Non : pas de service web en plus</td></tr>
+							</tbody>
+						</table>
+						<aside class="notes">
+							0:28-0:38 — Pendant que le script tourne, expliquer le choix IP / nom de domaine et
+							pourquoi refuser le serveur HTTP.
+							Dans le conteneur (root@rustdesk), les commandes lxc ne sont plus disponibles.
+							Si le script traîne ou échoue : exit, puis lxc restore rustdesk etape6-installe.
+							« Comme dans une émission de cuisine, voici celui que j'ai préparé avant. »
+						</aside>
+					</section>
+
+					<section>
+						<h2><span class="step">7</span> Noter la clé publique</h2>
+						<pre><code class="language-plaintext" data-trim data-line-numbers="2">
+Your IP/DNS Address is rustdesk.hacktech.dev
+Your public key is &lt;CLE_PUBLIQUE&gt;
+Install Rustdesk on your machines and change your public key and IP/DNS name to the above
+						</code></pre>
+						<p>Elle reste disponible dans le conteneur :</p>
+						<pre><code class="language-bash" data-trim>
+cat /opt/rustdesk/id_ed25519.pub
+						</code></pre>
+						<div class="callout warn">
+							Elle sera demandée par <strong>chaque client</strong>. Sa moitié privée,
+							<code>id_ed25519</code>, est l'élément irremplaçable du serveur.
+						</div>
+						<aside class="notes">
+							Montrer la clé publique (masquée si c'est une vraie clé).
+						</aside>
+					</section>
+
+					<section>
+						<h2><span class="step">8</span> Vérifier et tester</h2>
+						<div class="cols">
+							<div>
+								<p class="small muted">Dans le conteneur</p>
+								<pre><code class="language-plaintext" data-trim>
+# systemctl list-units | grep -i rust
+rustdeskrelay.service   active running
+rustdesksignal.service  active running
+								</code></pre>
+							</div>
+							<div>
+								<p class="small muted">Depuis un poste extérieur</p>
+								<pre><code class="language-plaintext" data-trim>
+$ nc -zv 203.0.113.10 21116
+... succeeded!
+$ nc -zv 203.0.113.10 21117
+... succeeded!
+								</code></pre>
+							</div>
+						</div>
+						<div class="callout">
+							<code>nc</code> ne teste que TCP. L'UDP 21116 se confirme quand le client affiche
+							<strong>« Prêt »</strong>.
+						</div>
+						<aside class="notes">
+							0:38-0:40 — « Dans le conteneur, cette fois, hbbs et hbbr écoutent bien. »
+							Services : rustdesksignal (hbbs) et rustdeskrelay (hbbr).
+						</aside>
+					</section>
+				</section>
+
+				<!-- ============================================================
+				     4. Les clients
+				     ============================================================ -->
+
+				<section>
+					<section>
+						<p class="kicker">4. Les clients</p>
+						<h2>Installer le client</h2>
+						<pre><code class="language-bash" data-trim>
+wget https://github.com/rustdesk/rustdesk/releases/download/1.5.0/rustdesk-1.5.0-x86_64.AppImage
+chmod +x rustdesk-1.5.0-x86_64.AppImage
+./rustdesk-1.5.0-x86_64.AppImage
+						</code></pre>
+						<div class="cols" style="align-items: center; grid-template-columns: 1fr 1.3fr">
+							<p class="small">« <span class="bad">Pas prêt ; veuillez vérifier la connexion</span> » est <strong>normal</strong> : le client n'est pas encore configuré.</p>
+							<img class="shot" src="assets/rustdesk/rustdesk01.png" alt="Fenêtre principale de RustDesk avec le message Pas prêt" style="max-height: 340px" />
+						</div>
+					</section>
+
+					<section>
+						<h2>Configurer le serveur</h2>
+						<div class="cols" style="align-items: center">
+							<ol class="small">
+								<li>Menu « burger » en haut à droite</li>
+								<li><strong>Paramètres</strong> → <strong>Réseau</strong></li>
+								<li><strong>Serveur ID/Relais</strong></li>
+								<li>Remplir le formulaire, puis <strong>Valider</strong></li>
+							</ol>
+							<div class="r-stack">
+								<img class="shot" src="assets/rustdesk/rustdesk05.png" alt="Paramètres, onglet Réseau" />
+								<img class="shot fragment" src="assets/rustdesk/rustdesk09.png" alt="Formulaire Serveur ID/relais rempli avec rustdesk.hacktech.dev" />
+							</div>
+						</div>
+						<aside class="notes">
+							0:40-0:50 — Inviter un volontaire (Android ou portable) : il installe le client et
+							configure Serveur ID et Clé. Attendre « Prêt », puis se connecter à son appareil.
+							Si c'est trop long : basculer sur le poste B.
+							Le message orange sous « Serveur API » (HTTP par défaut quand le champ est vide) est
+							normal avec le serveur OSS : laisser ce champ vide.
+						</aside>
+					</section>
+
+					<section>
+						<h2>Configuration du client</h2>
+						<div class="cols" style="align-items: center; grid-template-columns: 1fr 1.2fr">
+							<div>
+								<table>
+									<thead><tr><th>Champ</th><th>Valeur</th></tr></thead>
+									<tbody>
+										<tr><td>Serveur ID</td><td><code>rustdesk.hacktech.dev</code></td></tr>
+										<tr><td>Clé</td><td><code>&lt;CLE_PUBLIQUE&gt;</code></td></tr>
+										<tr><td>Relais, API</td><td class="muted">vides</td></tr>
+									</tbody>
+								</table>
+								<div class="callout warn">
+									Sur <strong>chaque poste</strong> : celui qui contrôle <strong>et</strong> celui qui est contrôlé
+								</div>
+							</div>
+							<img class="shot" src="assets/rustdesk/rustdesk08.png" alt="Message Succès après validation" />
+						</div>
+						<aside class="notes">
+							« Succès » confirme l'enregistrement. De retour sur l'onglet Accueil, le bas de la
+							fenêtre doit afficher « Prêt ».
+						</aside>
+					</section>
+
+					<section>
+						<h2>Se connecter à un poste distant</h2>
+						<div class="cols" style="align-items: center">
+							<ol class="small">
+								<li>Sur le poste <strong>distant</strong> : relever l'<strong>ID</strong> et le <strong>mot de passe à usage unique</strong> (panneau « Votre bureau »)</li>
+								<li>Sur le poste de <strong>contrôle</strong> : saisir l'ID, puis <strong>Se connecter</strong></li>
+								<li>Saisir le mot de passe : le bureau distant s'affiche</li>
+							</ol>
+							<img class="shot" src="assets/rustdesk/rustdesk01.png" alt="Onglet Accueil : ID, mot de passe, bouton Se connecter" />
+						</div>
+						<div class="callout warn">
+							L'ID peut changer après le passage au serveur auto-hébergé : utiliser celui affiché
+							<strong>après</strong> la configuration. Le bouton <strong>Connexion</strong> (au centre) sert aux comptes Pro.
+						</div>
+					</section>
+				</section>
+
+				<!-- ============================================================
+				     Démo : contrôler le portable depuis un smartphone Android
+				     ============================================================ -->
+
+				<section>
+					<section class="title-slide">
+						<p class="kicker">Démonstration</p>
+						<img src="assets/rustdesk/android-icone.png" alt="Icône de l'application RustDesk pour Android" style="height: 120px; margin: 0" />
+						<h1>Démo</h1>
+						<h2>Contrôler mon ordinateur portable depuis un smartphone</h2>
+						<p>avec l'application <strong>RustDesk pour Android</strong>, à travers <span class="accent">rustdesk.hacktech.dev</span></p>
+						<aside class="notes">
+							Démonstration en direct : le smartphone Android prend la main sur l'ordinateur portable,
+							à travers le serveur auto-hébergé. Les deux appareils doivent être configurés avec
+							rustdesk.hacktech.dev et la clé publique, et afficher « Prêt ».
+							Flèche bas : les étapes, avec les captures en secours si le réseau de la salle bloque.
+						</aside>
+					</section>
+
+					<section>
+						<h2>Installer l'application Android</h2>
+						<div class="cols" style="align-items: center; grid-template-columns: 1.6fr 1fr">
+							<div>
+								<p><span class="step">1</span> Via le magasin d'applications libres <strong>F-Droid</strong></p>
+								<p><span class="step">2</span> Ou directement l'APK depuis GitHub :</p>
+								<pre><code class="language-plaintext" data-trim>
+https://github.com/rustdesk/rustdesk/releases/download/1.5.3/
+  rustdesk-1.5.3-universal-signed.apk
+								</code></pre>
+								<p><span class="step">3</span> Onglet <strong>Paramètres</strong> : Serveur ID <code>rustdesk.hacktech.dev</code> + <strong>clé</strong></p>
+							</div>
+							<div style="text-align: center">
+								<img src="assets/rustdesk/android-icone.png" alt="Icône RustDesk sur l'écran d'accueil du téléphone" style="height: 190px; margin: 0" />
+								<p class="small muted">L'icône s'affiche sur l'accueil</p>
+							</div>
+						</div>
+						<div class="callout warn">
+							Comme sur le portable : sans serveur ID et clé, le téléphone passe par les serveurs publics
+							et ne trouve pas le portable.
+						</div>
+					</section>
+
+					<section>
+						<h2>Sur le portable : relever l'ID et le mot de passe</h2>
+						<div class="cols" style="align-items: center; grid-template-columns: 1fr 1.3fr">
+							<ul class="small">
+								<li>Panneau « Votre bureau », en haut à gauche</li>
+								<li><strong>ID</strong> : l'identifiant numérique RustDesk du portable</li>
+								<li>Juste en dessous : le <strong>mot de passe à usage unique</strong></li>
+								<li>En bas : <span class="ok">● Prêt</span> = connecté à notre serveur</li>
+							</ul>
+							<img class="shot" src="assets/rustdesk/rustdesk11.png" alt="Client RustDesk du portable : ID, mot de passe à usage unique, statut Prêt" style="max-height: 400px" />
+						</div>
+						<aside class="notes">
+							Masquer l'ID et le mot de passe réels à l'écran si la session est enregistrée ou diffusée.
+						</aside>
+					</section>
+
+					<section>
+						<h2>Sur le téléphone : prendre la main</h2>
+						<div class="cols three" style="text-align: center; gap: 36px">
+							<div>
+								<img class="shot" src="assets/rustdesk/android-01-id.png" alt="Application Android : champ ID de l'appareil distant" style="height: 440px" />
+								<p class="small"><span class="step">1</span> Saisir l'<strong>ID</strong> du portable, puis <strong>→</strong></p>
+							</div>
+							<div class="fragment">
+								<img class="shot" src="assets/rustdesk/android-02-mot-de-passe.png" alt="Application Android : fenêtre Mot de passe requis" style="height: 440px" />
+								<p class="small"><span class="step">2</span> Taper le <strong>mot de passe</strong>, <strong>Valider</strong></p>
+							</div>
+							<div class="fragment">
+								<img class="shot" src="assets/rustdesk/android-03-bureau.png" alt="Application Android : le bureau du portable s'affiche" style="height: 440px" />
+								<p class="small"><span class="step">3</span> Le <strong>bureau du portable</strong> s'affiche</p>
+							</div>
+						</div>
+						<aside class="notes">
+							Passer en démonstration réelle : projeter l'écran du portable, et montrer le téléphone
+							(caméra ou partage d'écran du téléphone). Bouger la souris et ouvrir une fenêtre depuis le
+							téléphone. La barre bleue en bas donne accès au clavier, à la souris et au chat.
+							Si le réseau de la salle bloque : dérouler ces trois captures, ou le partage 4G.
+						</aside>
+					</section>
+				</section>
+
+				<!-- ============================================================
+				     5. Dépanner
+				     ============================================================ -->
+
+				<section>
+					<section>
+						<p class="kicker">5. Dépanner</p>
+						<h2>Les pièges classiques</h2>
+						<table>
+							<thead><tr><th>Symptôme</th><th>Cause</th></tr></thead>
+							<tbody>
+								<tr class="fragment"><td><code>rs-ny.rustdesk.com:21116</code></td><td>Un des deux postes n'est pas configuré</td></tr>
+								<tr class="fragment"><td><code>Connexion refusée</code> port 21114</td><td>Bouton <strong>Connexion</strong> (compte) : réservé à la version Pro</td></tr>
+								<tr class="fragment"><td>« Pas prêt »</td><td>Serveur injoignable, clé ou IP erronée</td></tr>
+							</tbody>
+						</table>
+						<aside class="notes">
+							0:50-0:53 — Provoquer les erreurs en direct (demo.md, étape 9) : clé fausse, puis clic
+							sur le bouton Connexion. Flèche bas pour les solutions détaillées.
+						</aside>
+					</section>
+
+					<section>
+						<h2>Erreur sur le port 21114</h2>
+						<pre class="error"><code class="language-plaintext" data-trim>
+reqwest::Error { kind: Request, url: "http://203.0.113.10:21114/api/login-options", ...
+ConnectError("tcp connect error", 203.0.113.10:21114, ... "Connexion refusée" }
+						</code></pre>
+						<p class="small"><strong>Cause</strong> : le client cherche le serveur API, qui n'existe que dans <strong>Server Pro</strong> (comptes, carnet d'adresses, OIDC).</p>
+						<ul class="small">
+							<li>Ne pas utiliser le bouton <strong>Connexion</strong> : se connecter avec l'<strong>ID et le mot de passe</strong> du poste</li>
+							<li>Laisser <strong>Serveur API</strong> vide, même après import de la chaîne de configuration</li>
+							<li>Ne pas ouvrir le port 21114</li>
+						</ul>
+					</section>
+
+					<section>
+						<h2>Erreur <code>rs-ny.rustdesk.com</code></h2>
+						<pre class="error"><code class="language-plaintext" data-trim>
+fallback failed: Failed to connect to rs-ny.rustdesk.com:21116
+						</code></pre>
+						<p class="small"><strong>Cause</strong> : au moins un des deux postes utilise encore les serveurs publics.</p>
+						<ul class="small">
+							<li>Vérifier serveur ID et clé sur <strong>les deux postes</strong> (bouton <strong>Valider</strong>)</li>
+							<li>Fermer complètement le client, puis le relancer</li>
+							<li>Vérifier que les deux postes affichent « Prêt »</li>
+							<li>Utiliser l'ID affiché <strong>après</strong> le changement de serveur</li>
+						</ul>
+					</section>
+				</section>
+
+				<!-- ============================================================
+				     6. Exploiter
+				     ============================================================ -->
+
+				<section>
+					<section>
+						<p class="kicker">6. Exploiter</p>
+						<h2>Sauvegarde : quoi protéger ?</h2>
+						<div class="cols">
+							<div class="card card-bad">
+								<h3>La paire de clés</h3>
+								<p><code>id_ed25519</code> / <code>id_ed25519.pub</code></p>
+								<p>Perdue = nouvelle clé générée = <strong>reconfigurer tous les clients</strong></p>
+							</div>
+							<div class="card card-accent">
+								<h3>La base</h3>
+								<p><code>db_v2.sqlite3</code></p>
+								<p>Contient les ID des postes enregistrés</p>
+							</div>
+						</div>
+						<p class="small muted">Tout se trouve dans <code>/opt/rustdesk/</code></p>
+						<aside class="notes">
+							0:53-0:55 — Insister sur la clé privée : c'est l'élément irremplaçable.
+							Flèche bas : snapshots, copie externe, export.
+						</aside>
+					</section>
+
+					<section>
+						<h2>Snapshots LXD</h2>
+						<pre><code class="language-bash" data-trim data-line-numbers="1|2|4-5">
+lxc snapshot rustdesk apres-install                 # point de reprise
+lxc restore rustdesk apres-install                  # retour arrière
+
+lxc config set rustdesk snapshots.schedule "@daily" # un par jour
+lxc config set rustdesk snapshots.expiry 7d         # gardés 7 jours
+						</code></pre>
+						<div class="callout warn">
+							Un snapshot est stocké sur le <strong>même disque</strong> que le conteneur : il ne
+							protège pas d'une panne de l'hôte.
+						</div>
+					</section>
+
+					<section>
+						<h2>Copie externe et export</h2>
+						<pre><code class="language-bash" data-trim data-line-numbers="1-4|6|7">
+mkdir -p ~/sauvegarde-rustdesk
+lxc file pull rustdesk/opt/rustdesk/id_ed25519 rustdesk/opt/rustdesk/id_ed25519.pub \
+  rustdesk/opt/rustdesk/db_v2.sqlite3 ~/sauvegarde-rustdesk/
+chmod 600 ~/sauvegarde-rustdesk/id_ed25519
+
+lxc export rustdesk rustdesk-sauvegarde.tar.gz      # conteneur complet
+lxc import rustdesk-sauvegarde.tar.gz               # restauration, ici ou ailleurs
+						</code></pre>
+						<ul class="small">
+							<li>Rapatrier ensuite la copie sur un autre poste (<code>scp</code>)</li>
+							<li>Sur un autre hôte : adapter l'adresse <code>listen</code> des proxy devices</li>
+							<li>Clés restaurées (<code>lxc file push</code>) = clients inchangés</li>
+						</ul>
+					</section>
+				</section>
+
+				<section>
+					<p class="kicker">6. Exploiter</p>
+					<h2>Mise à jour</h2>
+					<pre><code class="language-bash" data-trim data-line-numbers="1|3-6|7|9">
+lxc snapshot rustdesk avant-maj                     # sur l'hôte
+
+lxc exec rustdesk -- bash                           # dans le conteneur
+wget https://raw.githubusercontent.com/techahold/rustdeskinstall/master/update.sh
+chmod +x update.sh
+./update.sh
+systemctl list-units | grep -i rust                 # services relancés ?
+
+lxc delete rustdesk/avant-maj                       # si tout va bien
+					</code></pre>
+					<div class="callout ok">
+						La mise à jour conserve la paire de clés. En cas de problème :
+						<code>lxc restore rustdesk avant-maj</code>
+					</div>
+				</section>
+
+				<section>
+					<section>
+						<p class="kicker">6. Exploiter</p>
+						<h2>Sécurité</h2>
+						<ul>
+							<li class="fragment">🔑 <strong>La clé doit être obligatoire</strong> : tester avec une clé fausse</li>
+							<li class="fragment">🔐 <strong>SSH par clé</strong>, mots de passe désactivés</li>
+							<li class="fragment">🧍 C'est le <strong>mot de passe du poste</strong> qui protège l'accès, pas le serveur</li>
+							<li class="fragment">💾 <strong>Sauvegarder <code>id_ed25519</code></strong></li>
+							<li class="fragment">📸 <strong>Snapshot</strong> avant chaque mise à jour</li>
+						</ul>
+						<aside class="notes">
+							Flèche bas : détail du test de la clé, du SSH et des autres pistes (SECURITY.md).
+						</aside>
+					</section>
+
+					<section>
+						<h2>La clé est-elle obligatoire ?</h2>
+						<p class="small">Sinon, n'importe qui peut utiliser le serveur comme <strong>relais</strong> et consommer sa bande passante.</p>
+						<div class="cols">
+							<div class="card card-accent">
+								<h3>Test</h3>
+								<p>Configurer un client avec une clé <strong>vide ou fausse</strong>.</p>
+								<p>S'il passe à « Prêt » et se connecte : <span class="bad">clé non imposée</span>.</p>
+							</div>
+							<div class="card card-accent">
+								<h3>Contrôle</h3>
+								<p>Chercher l'option <code>-k</code> dans les services :</p>
+								<pre><code class="language-bash" data-trim>
+grep ExecStart \
+  /etc/systemd/system/rustdesksignal.service \
+  /etc/systemd/system/rustdeskrelay.service
+								</code></pre>
+							</div>
+						</div>
+					</section>
+
+					<section>
+						<h2>SSH par clé</h2>
+						<pre><code class="language-bash" data-trim data-line-numbers="1-2|3|5-6|7">
+ssh-keygen -t ed25519                               # sur le poste
+ssh-copy-id utilisateur@monserveur.monhebergement.fr
+ssh utilisateur@monserveur.monhebergement.fr        # doit marcher SANS mot de passe
+
+# /etc/ssh/sshd_config
+PasswordAuthentication no
+PermitRootLogin no
+sudo systemctl restart ssh
+						</code></pre>
+						<div class="callout warn">
+							Garder une session SSH ouverte pendant le changement, pour ne pas perdre l'accès en cas d'erreur.
+						</div>
+					</section>
+
+					<section>
+						<h2>Autres pistes</h2>
+						<table class="small">
+							<thead><tr><th>Priorité</th><th>Piste</th></tr></thead>
+							<tbody>
+								<tr><td class="bad">Haute</td><td>Postes : mot de passe à usage unique, 2FA, confirmation par clic</td></tr>
+								<tr><td class="warn">Moyenne</td><td>ufw en refus par défaut (SSH + trafic RustDesk redirigé)</td></tr>
+								<tr><td class="warn">Moyenne</td><td><code>unattended-upgrades</code> sur l'hôte <strong>et</strong> le conteneur</td></tr>
+								<tr><td class="warn">Moyenne</td><td>Conteneur non privilégié : <code>lxc config get rustdesk security.privileged</code></td></tr>
+								<tr><td class="muted">Basse</td><td>Lire <code>install.sh</code> / <code>update.sh</code> avant de les lancer (scripts tiers, en root)</td></tr>
+								<tr><td class="muted">Basse</td><td>Surveiller les journaux : <code>journalctl -u rustdesksignal -u rustdeskrelay</code></td></tr>
+							</tbody>
+						</table>
+						<p class="small muted">Détail dans <code>SECURITY.md</code> du dépôt du tutoriel</p>
+					</section>
+				</section>
+
+				<section>
+					<p class="kicker">6. Exploiter</p>
+					<h2>Désinstallation</h2>
+					<p>Tout RustDesk est dans le conteneur : <strong>le supprimer suffit</strong>.</p>
+					<pre><code class="language-bash" data-trim>
+lxc delete --force rustdesk        # conteneur, snapshots, proxy devices, règles DNAT
+sudo ufw route delete allow proto tcp to 10.10.10.50 port 21115:21117
+sudo ufw route delete allow proto udp to 10.10.10.50 port 21116
+					</code></pre>
+					<ul class="small">
+						<li>Sauvegarder d'abord les clés si elles peuvent resservir</li>
+						<li>Supprimer l'enregistrement DNS, s'il existe</li>
+						<li>Sur les clients : vider <strong>Serveur ID</strong> et <strong>Clé</strong> pour revenir aux serveurs publics</li>
+					</ul>
+				</section>
+
+				<!-- ============================================================
+				     Conclusion
+				     ============================================================ -->
+
+				<section>
+					<h2>À retenir</h2>
+					<div class="cols three">
+						<div class="card card-accent fragment">
+							<p class="big">1</p>
+							<h3>DNAT</h3>
+							<p><code>nat=true</code> : la redirection qui <strong>conserve l'IP</strong> des clients</p>
+						</div>
+						<div class="card card-accent fragment">
+							<p class="big">2</p>
+							<h3>La clé</h3>
+							<p>Obligatoire, notée, <strong>sauvegardée</strong></p>
+						</div>
+						<div class="card card-accent fragment">
+							<p class="big">3</p>
+							<h3>Les snapshots</h3>
+							<p>Le <strong>filet de sécurité</strong> de LXD</p>
+						</div>
+					</div>
+					<p class="small" style="margin-top: 1.2em">
+						Tutoriel complet :
+						<a href="https://github.com/HackTechDev/didacticiel_rustdesk">github.com/HackTechDev/didacticiel_rustdesk</a>
+					</p>
+					<aside class="notes">
+						0:55-0:60 — Afficher le QR code du dépôt (à générer : qrencode -o qr-depot.png
+						https://github.com/HackTechDev/didacticiel_rustdesk).
+					</aside>
+				</section>
+
+				<section class="title-slide">
+					<h1>Questions ?</h1>
+					<p class="small muted">
+						Sources :
+						<a href="https://rustdesk.com/docs/en/self-host/rustdesk-server-oss/install/">RustDesk – Installation OSS</a>
+						·
+						<a href="https://github.com/techahold/rustdeskinstall">techahold/rustdeskinstall</a>
+					</p>
+					<aside class="notes">
+						Fiche questions-réponses : tutoriel/presentation/questions-reponses.md.
+						Les slides de réserve suivent (flèche droite, puis bas).
+					</aside>
+				</section>
+
+				<!-- ============================================================
+				     Réserve : à afficher seulement si la question vient
+				     ============================================================ -->
+
+				<section>
+					<section>
+						<p class="kicker">Réserve</p>
+						<h2>Proxy avec ou sans <code>nat=true</code></h2>
+						<table>
+							<thead><tr><th></th><th><code>nat=true</code></th><th>Sans <code>nat</code></th></tr></thead>
+							<tbody>
+								<tr><td>Mécanisme</td><td>Règle DNAT dans le noyau</td><td>Processus <code>forkproxy</code> de LXD</td></tr>
+								<tr><td>IP vue par hbbs</td><td class="ok">IP du client ✅</td><td class="bad">IP de l'hôte ❌</td></tr>
+								<tr><td>Connexion directe</td><td>Possible</td><td>Impossible : tout passe par le relais</td></tr>
+								<tr><td>IP fixe du conteneur</td><td>Obligatoire</td><td>Non requise</td></tr>
+							</tbody>
+						</table>
+					</section>
+
+					<section>
+						<p class="kicker">Réserve</p>
+						<h2>OSS ou Pro ?</h2>
+						<div class="cols">
+							<div class="card card-ok">
+								<h3>OSS (gratuit, AGPL)</h3>
+								<ul>
+									<li>Serveur ID + relais</li>
+									<li>Connexion par ID + mot de passe du poste</li>
+									<li>Suffit pour un usage perso ou une petite équipe</li>
+								</ul>
+							</div>
+							<div class="card card-accent">
+								<h3>Pro (payant)</h3>
+								<ul>
+									<li>Console web, comptes utilisateurs</li>
+									<li>Carnet d'adresses partagé</li>
+									<li>OIDC / LDAP, API (port 21114)</li>
+									<li>Générateur de clients personnalisés</li>
+								</ul>
+							</div>
+						</div>
+					</section>
+
+					<section>
+						<p class="kicker">Réserve</p>
+						<h2>Questions fréquentes</h2>
+						<div class="cols">
+							<div class="card">
+								<h3>Chiffrement ?</h3>
+								<p>Sessions chiffrées. La clé publique permet au client de vérifier qu'il parle bien à <strong>ce</strong> serveur.</p>
+							</div>
+							<div class="card">
+								<h3>Bande passante ?</h3>
+								<p>Très faible en connexion directe. Consommée seulement quand le <strong>relais</strong> est utilisé.</p>
+							</div>
+							<div class="card">
+								<h3>IPv6 ?</h3>
+								<p>Non traité : il faudrait des proxy devices pour l'IPv6 de l'hôte.</p>
+							</div>
+							<div class="card">
+								<h3>Priorité à la souris locale ?</h3>
+								<p>Non. Couper le contrôle depuis la fenêtre de connexion, ou <strong>Paramètres › Sécurité › Permissions</strong>.</p>
+							</div>
+						</div>
+					</section>
+				</section>
 			</div>
 		</div>
 
@@ -28,15 +1215,22 @@
 		<script src="dist/plugin/notes.js"></script>
 		<script src="dist/plugin/markdown.js"></script>
 		<script src="dist/plugin/highlight.js"></script>
+		<script src="dist/plugin/zoom.js"></script>
 		<script>
 			// More info about initialization & config:
 			// - https://revealjs.com/initialization/
 			// - https://revealjs.com/config/
 			Reveal.initialize({
 				hash: true,
+				width: 1280,
+				height: 720,
+				margin: 0.05,
+				slideNumber: 'c/t',
+				transition: 'slide',
+				backgroundTransition: 'fade',
 
 				// Learn about plugins: https://revealjs.com/plugins/
-				plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
+				plugins: [RevealMarkdown, RevealHighlight, RevealNotes, RevealZoom],
 			});
 		</script>
 	</body>

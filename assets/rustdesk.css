@@ -1,0 +1,356 @@
+/*
+ * Thème du diaporama « Son propre serveur RustDesk dans LXD ».
+ * Chargé après dist/theme/black.css : ne fait que surcharger ses variables
+ * et ajouter quelques composants (cartes, encadrés, schémas SVG).
+ */
+
+:root {
+	--r-background: #0e1622;
+	--r-background-color: #0e1622;
+	--r-main-color: #e6ebf2;
+	--r-heading-color: #ffffff;
+	--r-heading-text-transform: none;
+	--r-heading-font-weight: 700;
+	--r-main-font-size: 34px;
+	--r-link-color: #4c9bff;
+	--r-link-color-hover: #7db6ff;
+	--r-code-font: 'JetBrains Mono', 'Fira Code', 'DejaVu Sans Mono', monospace;
+
+	--accent: #2f86ff;
+	--accent-soft: rgba(47, 134, 255, 0.14);
+	--ok: #3ecf8e;
+	--ok-soft: rgba(62, 207, 142, 0.14);
+	--warn: #ffb547;
+	--warn-soft: rgba(255, 181, 71, 0.14);
+	--bad: #ff6b6b;
+	--bad-soft: rgba(255, 107, 107, 0.14);
+	--muted: #93a1b5;
+	--surface: #162233;
+	--surface-2: #1e2d42;
+	--line: #2c3e57;
+}
+
+.reveal-viewport {
+	background: radial-gradient(ellipse at top right, #15243a 0%, var(--r-background) 60%);
+}
+
+.reveal h1 {
+	font-size: 2.1em;
+}
+.reveal h2 {
+	font-size: 1.45em;
+	margin-bottom: 0.6em;
+}
+.reveal h3 {
+	font-size: 1em;
+	color: var(--accent);
+}
+
+/* Barre d'accent sous les titres des slides de contenu */
+.reveal .slides section > h2:first-child::after {
+	content: '';
+	display: block;
+	width: 80px;
+	height: 5px;
+	margin: 14px auto 0;
+	border-radius: 3px;
+	background: var(--accent);
+}
+
+.reveal strong {
+	color: #ffffff;
+}
+.reveal em {
+	color: var(--muted);
+}
+.reveal .muted {
+	color: var(--muted);
+}
+.reveal .small {
+	font-size: 0.7em;
+}
+.reveal .accent {
+	color: var(--accent);
+}
+.reveal .ok {
+	color: var(--ok);
+}
+.reveal .warn {
+	color: var(--warn);
+}
+.reveal .bad {
+	color: var(--bad);
+}
+
+.reveal ul,
+.reveal ol {
+	display: block;
+	margin-left: 1.2em;
+}
+.reveal li {
+	margin: 0.25em 0;
+}
+
+/* Code */
+.reveal pre {
+	width: 100%;
+	font-size: 0.56em;
+	box-shadow: none;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	overflow: hidden;
+}
+.reveal pre code {
+	max-height: 520px;
+	padding: 14px 18px;
+	line-height: 1.45;
+	background: #0a111b;
+}
+.reveal :not(pre) > code {
+	padding: 0.05em 0.3em;
+	border-radius: 5px;
+	background: var(--surface-2);
+	color: #ffd88a;
+	font-size: 0.88em;
+}
+.reveal pre.error {
+	font-size: 0.62em;
+	border-color: var(--bad);
+}
+.reveal pre.error code {
+	color: var(--bad);
+	white-space: pre-wrap;
+}
+
+/* Tableaux */
+.reveal table {
+	font-size: 0.72em;
+	border-collapse: collapse;
+	margin: 0.4em auto;
+}
+.reveal table th {
+	color: var(--accent);
+	border-bottom: 2px solid var(--accent);
+}
+.reveal table th,
+.reveal table td {
+	padding: 0.4em 0.8em;
+	text-align: left;
+}
+.reveal table td {
+	border-bottom: 1px solid var(--line);
+}
+
+/* Encadrés */
+.reveal .callout {
+	margin: 0.6em auto 0;
+	padding: 0.55em 0.9em;
+	border-left: 6px solid var(--accent);
+	border-radius: 8px;
+	background: var(--accent-soft);
+	font-size: 0.72em;
+	text-align: left;
+}
+.reveal .callout.warn {
+	border-color: var(--warn);
+	background: var(--warn-soft);
+	color: var(--r-main-color);
+}
+.reveal .callout.bad {
+	border-color: var(--bad);
+	background: var(--bad-soft);
+	color: var(--r-main-color);
+}
+.reveal .callout.ok {
+	border-color: var(--ok);
+	background: var(--ok-soft);
+	color: var(--r-main-color);
+}
+
+/* Grilles et cartes */
+.reveal .cols {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 28px;
+	align-items: start;
+	text-align: left;
+}
+.reveal .cols.three {
+	grid-template-columns: 1fr 1fr 1fr;
+}
+.reveal .cols.wide-left {
+	grid-template-columns: 1.4fr 1fr;
+}
+.reveal .card {
+	padding: 0.7em 0.9em;
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	background: var(--surface);
+	font-size: 0.72em;
+}
+.reveal .card h3 {
+	margin: 0 0 0.4em;
+	font-size: 1.15em;
+}
+.reveal .card ul {
+	margin-left: 1em;
+}
+.reveal .card.card-ok {
+	border-top: 5px solid var(--ok);
+}
+.reveal .card.card-bad {
+	border-top: 5px solid var(--bad);
+}
+.reveal .card.card-accent {
+	border-top: 5px solid var(--accent);
+}
+
+/* Grand nombre / mot-clé */
+.reveal .big {
+	font-size: 2.4em;
+	font-weight: 700;
+	line-height: 1;
+	color: var(--accent);
+}
+
+/* Captures d'écran */
+.reveal img.shot {
+	border: 2px solid rgba(230, 235, 242, 0.55);
+	border-radius: 10px;
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+	margin: 0;
+}
+
+/* Étapes numérotées */
+.reveal .step {
+	display: inline-block;
+	min-width: 1.6em;
+	padding: 0.05em 0.35em;
+	margin-right: 0.3em;
+	border-radius: 999px;
+	background: var(--accent);
+	color: #fff;
+	font-weight: 700;
+	font-size: 0.8em;
+	text-align: center;
+}
+.reveal .kicker {
+	font-size: 0.55em;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--accent);
+	font-weight: 700;
+	margin-bottom: 0.3em;
+}
+
+/* Slide de titre / de section */
+.reveal section.title-slide h1 {
+	font-size: 2.5em;
+	margin-bottom: 0.1em;
+}
+.reveal section.title-slide h2::after {
+	display: none !important;
+}
+.reveal section.title-slide h2 {
+	color: var(--accent);
+	font-weight: 600;
+}
+
+/* Schémas SVG */
+.reveal svg.diagram {
+	width: 100%;
+	height: auto;
+	font-family: var(--r-main-font);
+}
+.diagram .box {
+	fill: var(--surface);
+	stroke: var(--line);
+	stroke-width: 2;
+}
+.diagram .box-accent {
+	fill: var(--accent-soft);
+	stroke: var(--accent);
+	stroke-width: 2.5;
+}
+.diagram .box-ok {
+	fill: var(--ok-soft);
+	stroke: var(--ok);
+	stroke-width: 2.5;
+}
+.diagram .box-warn {
+	fill: var(--warn-soft);
+	stroke: var(--warn);
+	stroke-width: 2.5;
+}
+.diagram .box-bad {
+	fill: var(--bad-soft);
+	stroke: var(--bad);
+	stroke-width: 2.5;
+}
+.diagram .zone {
+	fill: none;
+	stroke: var(--muted);
+	stroke-width: 2;
+	stroke-dasharray: 8 6;
+}
+.diagram text {
+	fill: var(--r-main-color);
+	font-size: 22px;
+}
+.diagram text.t-title {
+	font-size: 25px;
+	font-weight: 700;
+	fill: #fff;
+}
+.diagram text.t-mono {
+	font-family: var(--r-code-font);
+	font-size: 19px;
+	fill: #ffd88a;
+}
+.diagram text.t-muted {
+	fill: var(--muted);
+	font-size: 18px;
+}
+.diagram text.t-ok {
+	fill: var(--ok);
+	font-weight: 700;
+}
+.diagram text.t-warn {
+	fill: var(--warn);
+	font-weight: 700;
+}
+.diagram text.t-bad {
+	fill: var(--bad);
+	font-weight: 700;
+}
+.diagram text.t-accent {
+	fill: var(--accent);
+	font-weight: 700;
+}
+.diagram .arrow {
+	stroke: var(--r-main-color);
+	stroke-width: 3;
+	fill: none;
+}
+.diagram .arrow-accent {
+	stroke: var(--accent);
+	stroke-width: 4;
+	fill: none;
+}
+.diagram .arrow-ok {
+	stroke: var(--ok);
+	stroke-width: 4;
+	fill: none;
+}
+.diagram .arrow-warn {
+	stroke: var(--warn);
+	stroke-width: 3;
+	fill: none;
+	stroke-dasharray: 10 7;
+}
+.diagram .arrow-bad {
+	stroke: var(--bad);
+	stroke-width: 3;
+	fill: none;
+	stroke-dasharray: 10 7;
+}
