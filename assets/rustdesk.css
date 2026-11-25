@@ -178,6 +178,10 @@
 .reveal .cols.three {
 	grid-template-columns: 1fr 1fr 1fr;
 }
+.reveal .cols.four {
+	grid-template-columns: 1fr 1fr 1fr 1fr;
+	gap: 20px;
+}
 .reveal .cols.wide-left {
 	grid-template-columns: 1.4fr 1fr;
 }
