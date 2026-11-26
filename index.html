@@ -233,7 +233,7 @@ fallback failed: Failed to connect to rs-ny.rustdesk.com:21116
 						<aside class="notes">
 							① Les deux postes s'enregistrent auprès de hbbs, qui les met en relation.
 							② Ils essaient ensuite de se connecter directement (hole punching).
-							③ Si les pare-feu l'empêchent, le trafic passe par hbbr : c'est seulement là que le
+							③ Si la connexion directe échoue (réseau trop restrictif), le trafic passe par hbbr : c'est seulement là que le
 							serveur consomme de la bande passante.
 						</aside>
 					</section>
@@ -449,11 +449,6 @@ Après : client 198.51.100.7 → 10.10.10.50:21116    (source inchangée ✅)
 							<text class="t-ok" x="550" y="275" text-anchor="middle">destination réécrite, IP du client conservée : hbbs voit 198.51.100.7</text>
 						</g>
 					</svg>
-					<aside class="notes">
-						Si la question du pare-feu vient (le tutoriel en parle) : pas de ufw sur la machine de démo.
-						Avec ufw actif, le trafic redirigé passe par la chaîne FORWARD : il faut ajouter
-						ufw route allow vers 10.10.10.50 (TCP 21115:21117, UDP 21116), ufw allow ne suffit pas.
-					</aside>
 				</section>
 
 				<!-- ============================================================
