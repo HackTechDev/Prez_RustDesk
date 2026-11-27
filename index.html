@@ -1250,6 +1250,9 @@ chmod 700 /opt/rustdesk
 						<aside class="notes">
 							Commandes en root dans le conteneur. Si un processus est compromis, il n'a que les droits
 							de l'utilisateur rustdesk, pas ceux de root.
+							Si la question vient : les binaires hbbs et hbbr sont aussi dans /opt/rustdesk, donc modifiables
+							par le service (persistance après une compromission). Pour aller plus loin : les sortir dans
+							/usr/local/bin, root:root, et pointer ExecStart dessus (à refaire après chaque update.sh).
 						</aside>
 					</section>
 
