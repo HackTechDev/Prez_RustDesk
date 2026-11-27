@@ -1094,6 +1094,15 @@ systemctl cat rustdesksignal rustdeskrelay \
 								<p class="small muted">Inclut les overrides, contrairement à un <code>grep</code> sur les <code>.service</code>.</p>
 							</div>
 						</div>
+						<aside class="notes">
+							-k _ : le « _ » veut dire « utiliser la clé du fichier id_ed25519 (dans /opt/rustdesk) et la rendre
+							obligatoire ». C'est sa clé publique qu'on saisit dans le champ Clé des clients ; un client sans
+							cette clé est refusé. On pourrait aussi écrire la clé en clair (-k &lt;clé&gt;), mais elle apparaîtrait
+							dans ps et dans le fichier de service.
+							Sans clé imposée, n'importe qui connaissant l'adresse du serveur peut utiliser le relais hbbr.
+							Le comportement sans -k dépend de la version de rustdesk-server : le test avec une clé fausse
+							reste la seule preuve fiable.
+						</aside>
 					</section>
 
 					<section data-visibility="hidden">
@@ -1307,7 +1316,7 @@ SystemCallFilter=~@privileged @resources
 						</div>
 						<aside class="notes">
 							Ne pas lire les options une par une : donner les familles (droits, fichiers, noyau, réseau).
-							L'override est un drop-in : il survit aux mises à jour du fichier .service.
+							L'override est un drop-in : il survit aux mises à jour du fichier .service. Le « -k _ » est expliqué dans la note de « La clé est-elle obligatoire ? ».
 						</aside>
 					</section>
 
