@@ -1033,7 +1033,7 @@ lxc import rustdesk-sauvegarde.tar.gz               # restauration, ici ou aille
 						<ul class="small">
 							<li>Rapatrier ensuite la copie sur un autre poste (<code>scp</code>)</li>
 							<li>Sur un autre hôte : adapter l'adresse <code>listen</code> des proxy devices</li>
-							<li>Clés restaurées (<code>lxc file push</code>) = clients inchangés</li>
+							<li>Clés restaurées (<code>lxc file push</code>, puis <code>chown -R rustdesk:rustdesk /opt/rustdesk</code> si utilisateur dédié) = clients inchangés</li>
 						</ul>
 					</section>
 				</section>
@@ -1048,7 +1048,7 @@ lxc exec rustdesk -- bash                           # dans le conteneur
 wget https://raw.githubusercontent.com/techahold/rustdeskinstall/master/update.sh
 chmod +x update.sh
 ./update.sh
-chown -R rustdesk:rustdesk /opt/rustdesk /var/log/rustdesk  # update.sh tourne en root
+chown -R rustdesk:rustdesk /opt/rustdesk /var/log/rustdesk  # si utilisateur dédié
 systemctl restart rustdesksignal rustdeskrelay
 systemctl list-units | grep -i rust                 # services relancés ?
 
@@ -1071,7 +1071,7 @@ lxc delete rustdesk/avant-maj                       # si tout va bien
 							<li class="fragment">👤 <strong>Utilisateur dédié</strong> et protections systemd</li>
 						</ul>
 						<aside class="notes">
-							Flèche bas : détail du test de la clé, puis l'utilisateur dédié et le durcissement systemd. SSH par clé et autres pistes : voir SECURITY.md du tutoriel.
+							Flèche bas : détail du test de la clé. Utilisateur dédié et durcissement systemd : slides de réserve, après « Questions fréquentes ». SSH par clé et autres pistes : voir SECURITY.md du tutoriel.
 						</aside>
 					</section>
 
@@ -1094,111 +1094,6 @@ systemctl cat rustdesksignal rustdeskrelay \
 								<p class="small muted">Inclut les overrides, contrairement à un <code>grep</code> sur les <code>.service</code>.</p>
 							</div>
 						</div>
-					</section>
-
-					<section>
-						<h2>Un utilisateur dédié</h2>
-						<p class="small">Par défaut, hbbs et hbbr tournent en <strong>root</strong>. On leur donne un utilisateur système sans shell.</p>
-						<pre><code class="language-bash" data-trim data-line-numbers="1|2|3-4">
-useradd --system --home-dir /opt/rustdesk --shell /usr/sbin/nologin rustdesk
-chown -R rustdesk:rustdesk /opt/rustdesk /var/log/rustdesk
-chmod 600 /opt/rustdesk/id_ed25519
-chmod 700 /opt/rustdesk
-						</code></pre>
-						<div class="callout warn">
-							Après le <code>chmod 700</code>, la clé publique se lit avec
-							<code>sudo cat /opt/rustdesk/id_ed25519.pub</code>.
-						</div>
-						<aside class="notes">
-							Commandes en root dans le conteneur. Si un processus est compromis, il n'a que les droits
-							de l'utilisateur rustdesk, pas ceux de root.
-						</aside>
-					</section>
-
-					<section>
-						<h2>Les protections systemd</h2>
-						<p class="small"><code>systemctl edit rustdeskrelay</code> (idem pour <code>rustdesksignal</code> avec <code>hbbs</code>) :</p>
-						<div class="cols">
-							<pre style="font-size: 0.45em"><code class="language-ini" data-trim>
-[Service]
-User=rustdesk
-Group=rustdesk
-ExecStart=
-ExecStart=/opt/rustdesk/hbbr -k _
-
-# Droits
-NoNewPrivileges=yes
-CapabilityBoundingSet=
-AmbientCapabilities=
-UMask=0077
-
-# Système de fichiers
-ProtectSystem=strict
-ReadWritePaths=/opt/rustdesk /var/log/rustdesk
-ProtectHome=yes
-PrivateTmp=yes
-PrivateDevices=yes
-							</code></pre>
-							<pre style="font-size: 0.45em"><code class="language-ini" data-trim>
-# Noyau et système
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
-ProtectKernelLogs=yes
-ProtectControlGroups=yes
-ProtectClock=yes
-ProtectHostname=yes
-RestrictNamespaces=yes
-RestrictRealtime=yes
-RestrictSUIDSGID=yes
-LockPersonality=yes
-MemoryDenyWriteExecute=yes
-
-# Réseau et appels système
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
-SystemCallArchitectures=native
-SystemCallFilter=@system-service
-SystemCallFilter=~@privileged @resources
-							</code></pre>
-						</div>
-						<div class="callout">
-							Le premier <code>ExecStart=</code>, vide, efface la commande d'origine.
-							Puis : <code>systemctl daemon-reload</code> et <code>systemctl restart rustdesksignal rustdeskrelay</code>.
-						</div>
-						<aside class="notes">
-							Ne pas lire les options une par une : donner les familles (droits, fichiers, noyau, réseau).
-							L'override est un drop-in : il survit aux mises à jour du fichier .service.
-						</aside>
-					</section>
-
-					<section>
-						<h2>Vérifier le durcissement</h2>
-						<div class="cols">
-							<div>
-								<pre><code class="language-plaintext" data-trim>
-# ps -eo user,cmd | grep hbb
-rustdesk /opt/rustdesk/hbbs -k _
-rustdesk /opt/rustdesk/hbbr -k _
-								</code></pre>
-								<pre><code class="language-plaintext" data-trim>
-# systemd-analyze security rustdeskrelay
-...
-→ Overall exposure level: 2.0 OK 🙂
-								</code></pre>
-								<p class="small muted">Sans protection : environ 9.6 UNSAFE</p>
-							</div>
-							<div>
-								<p class="small">Trois options restent ✗ : <code>NoNewPrivileges</code>, <code>ProtectControlGroups</code>, <code>ProtectKernelTunables</code>.</p>
-								<p class="small">LXD ajoute <code>zzz-lxc-service.conf</code>, lu <strong>après</strong> l'override, qui les remet à <code>no</code>.</p>
-							</div>
-						</div>
-						<div class="callout warn">
-							Un service ne démarre plus ? <code>journalctl -u rustdeskrelay -u rustdesksignal</code>,
-							puis commenter les options une par une.
-						</div>
-						<aside class="notes">
-							Fichier : /run/systemd/system/service.d/zzz-lxc-service.conf. Il s'applique à tous les
-							services du conteneur ; il explique aussi les ✗ sur ProtectProc et ProcSubset.
-						</aside>
 					</section>
 
 					<section data-visibility="hidden">
@@ -1337,6 +1232,112 @@ lxc delete --force rustdesk        # conteneur, snapshots, proxy devices, règle
 								<p>Non. Couper le contrôle depuis la fenêtre de connexion, ou <strong>Paramètres › Sécurité › Permissions</strong>.</p>
 							</div>
 						</div>
+					</section>
+
+					<section>
+						<p class="kicker">Réserve</p>
+						<h2>Un utilisateur dédié</h2>
+						<p class="small">Par défaut, hbbs et hbbr tournent en <strong>root</strong>. On leur donne un utilisateur système sans shell.</p>
+						<pre><code class="language-bash" data-trim data-line-numbers="1|2|3-4">
+useradd --system --home-dir /opt/rustdesk --shell /usr/sbin/nologin rustdesk
+chown -R rustdesk:rustdesk /opt/rustdesk /var/log/rustdesk
+chmod 600 /opt/rustdesk/id_ed25519
+chmod 700 /opt/rustdesk
+						</code></pre>
+						<div class="callout">
+							Après le <code>chmod 700</code>, seuls root et rustdesk ouvrent le dossier : <code>lxc exec</code>
+							et <code>lxc file pull</code> (en root) fonctionnent toujours.
+						</div>
+						<aside class="notes">
+							Commandes en root dans le conteneur. Si un processus est compromis, il n'a que les droits
+							de l'utilisateur rustdesk, pas ceux de root.
+						</aside>
+					</section>
+
+					<section>
+						<h2>Les protections systemd</h2>
+						<p class="small"><code>systemctl edit rustdeskrelay</code> (idem pour <code>rustdesksignal</code> avec <code>hbbs</code>) :</p>
+						<div class="cols">
+							<pre style="font-size: 0.45em"><code class="language-ini" data-trim>
+[Service]
+User=rustdesk
+Group=rustdesk
+ExecStart=
+ExecStart=/opt/rustdesk/hbbr -k _
+
+# Droits
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+
+# Système de fichiers
+ProtectSystem=strict
+ReadWritePaths=/opt/rustdesk /var/log/rustdesk
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+							</code></pre>
+							<pre style="font-size: 0.45em"><code class="language-ini" data-trim>
+# Noyau et système
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+# Réseau et appels système
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+							</code></pre>
+						</div>
+						<div class="callout">
+							Le premier <code>ExecStart=</code>, vide, efface la commande d'origine : recopier celle-ci
+							(<code>systemctl cat</code>) en gardant toutes ses options, dont <code>-k _</code>. Puis : <code>systemctl daemon-reload</code> et <code>systemctl restart rustdesksignal rustdeskrelay</code>.
+						</div>
+						<aside class="notes">
+							Ne pas lire les options une par une : donner les familles (droits, fichiers, noyau, réseau).
+							L'override est un drop-in : il survit aux mises à jour du fichier .service.
+						</aside>
+					</section>
+
+					<section>
+						<h2>Vérifier le durcissement</h2>
+						<div class="cols">
+							<div>
+								<pre><code class="language-plaintext" data-trim>
+# ps -eo user,cmd | grep hbb
+rustdesk /opt/rustdesk/hbbs -k _
+rustdesk /opt/rustdesk/hbbr -k _
+								</code></pre>
+								<pre><code class="language-plaintext" data-trim>
+# systemd-analyze security rustdeskrelay
+...
+→ Overall exposure level: 2.0 OK 🙂
+								</code></pre>
+								<p class="small muted">Sans protection : environ 9.6 UNSAFE</p>
+							</div>
+							<div>
+								<p class="small">Trois options restent ✗ : <code>NoNewPrivileges</code>, <code>ProtectControlGroups</code>, <code>ProtectKernelTunables</code>.</p>
+								<p class="small">LXD ajoute <code>zzz-lxc-service.conf</code>, lu <strong>après</strong> l'override, qui les remet à <code>no</code>.</p>
+							</div>
+						</div>
+						<div class="callout warn">
+							Un service ne démarre plus ? <code>journalctl -u rustdeskrelay -u rustdesksignal</code>,
+							puis commenter les options une par une.
+						</div>
+						<aside class="notes">
+							Fichier : /run/systemd/system/service.d/zzz-lxc-service.conf. Il s'applique à tous les
+							services du conteneur ; il explique aussi les ✗ sur ProtectProc et ProcSubset.
+						</aside>
 					</section>
 				</section>
 			</div>
